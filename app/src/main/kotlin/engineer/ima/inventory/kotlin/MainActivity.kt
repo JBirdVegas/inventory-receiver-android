@@ -1,8 +1,11 @@
 package engineer.ima.inventory.kotlin
 
+import android.Manifest
+import android.annotation.TargetApi
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Base64
@@ -12,6 +15,7 @@ import android.widget.Button
 import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Observer
 import androidx.work.*
 import com.google.android.gms.tasks.OnCompleteListener
@@ -20,6 +24,7 @@ import com.google.firebase.messaging.ktx.messaging
 import com.google.zxing.integration.android.IntentIntegrator
 import engineer.ima.inventory.R
 import engineer.ima.inventory.databinding.ActivityMainBinding
+import engineer.ima.inventory.kotlin.Application.Companion.runningQOrLater
 
 class MainActivity : AppCompatActivity() {
     private lateinit var listView: ListView
@@ -129,6 +134,24 @@ class MainActivity : AppCompatActivity() {
                 listViewAdapter.notifyDataSetChanged()
             }
         }
+    }
+
+    @TargetApi(29)
+    private fun foregroundAndBackgroundLocationPermissionApproved(): Boolean {
+        val foregroundLocationApproved = (
+                PackageManager.PERMISSION_GRANTED ==
+                        ActivityCompat.checkSelfPermission(this,
+                                Manifest.permission.ACCESS_FINE_LOCATION))
+        val backgroundPermissionApproved =
+                if (runningQOrLater) {
+                    PackageManager.PERMISSION_GRANTED ==
+                            ActivityCompat.checkSelfPermission(
+                                    this, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                            )
+                } else {
+                    true
+                }
+        return foregroundLocationApproved && backgroundPermissionApproved
     }
 
     companion object {

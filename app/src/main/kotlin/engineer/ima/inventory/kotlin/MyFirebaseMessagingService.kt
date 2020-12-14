@@ -36,7 +36,9 @@ data class DeviceCheckin(
         @SerializedName("last_updated")
         var lastUpdated: String? = null,
         @SerializedName("current_access_point")
-        var currentAccessPoint: AccessPoint? = null
+        var currentAccessPoint: AccessPoint? = null,
+        @SerializedName("location")
+        var location: Location? = null
 )
 
 data class KernelIds(
@@ -67,14 +69,45 @@ data class DeviceId(
         var userIds: UserIds? = null
 )
 
+data class Location(
+        var name: String? = null,
+        var address: String? = null,
+        var locality: String? = null,
+        @SerializedName("postal_code")
+        var postalCode: String? = null,
+        var country: String? = null,
+        var region: String? = null,
+        var latitude: String? = null,
+        var longitude: String? = null,
+        @SerializedName("iso_country_code")
+        var isoCountryCode: String? = null,
+        var altitude: String? = null,
+        var timezone: String? = null,
+        @SerializedName("thoroughfare")
+        var thoroughFare: String? = null,
+        @SerializedName("sub_thoroughfare")
+        var subThoroughFare: String? = null,
+        @SerializedName("administrative_area")
+        var administrativeArea: String? = null,
+        @SerializedName("sub_administrative_area")
+        var subAdmininstrativeArea: String? = null,
+        @SerializedName("h_accuracy")
+        var hAccuracy: String? = null,
+        @SerializedName("v_accuracy")
+        var vAccuracy: String? = null,
+        var direction: String? = null,
+        var speed: String? = null
+)
+
 data class DeviceStructure(
         @SerializedName("device_ids")
         var deviceIds: DeviceId? = null,
         @SerializedName("device_ids_unique_hash")
         var deviceIdsUniqueHash: String? = null,
         @SerializedName("device_checkin")
-        var deviceCheckin: DeviceCheckin? = null
-)
+        var deviceCheckin: DeviceCheckin? = null,
+
+        )
 
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
@@ -111,10 +144,11 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val from = ZonedDateTime.from(parsed)
         val zonedDateTime = from.format(ofPattern).format(getDayOfMonthSuffix(from.dayOfWeek.value))
 
-        val format = "Last Seen: %s\nPublic: %s\nLocal: %s\nWiFi AP: %s".format(zonedDateTime,
+        val format = "Last Seen: %s\nPublic: %s\nLocal: %s\nWiFi AP: %s\nAddress: %s".format(zonedDateTime,
                 deviceStructure.deviceCheckin?.public,
                 deviceStructure.deviceCheckin?.local,
-                deviceStructure.deviceCheckin?.currentAccessPoint?.ssid)
+                deviceStructure.deviceCheckin?.currentAccessPoint?.ssid,
+                deviceStructure.deviceCheckin?.location?.address)
         val notificationBuilder = deviceStructure.deviceIdsUniqueHash?.let {
             NotificationCompat.Builder(this, it)
                     .setSmallIcon(R.drawable.ic_stat_ic_notification)
