@@ -7,14 +7,14 @@ import java.time.format.DateTimeFormatterBuilder
 
 class TimeHelper {
     companion object {
-        fun format(v: String): String {
+        fun format(currentTime: String): String {
             return ZonedDateTime.from(DateTimeFormatterBuilder()
                     .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                     .optionalStart()
                     .appendOffset("+HH:MM", "Z")
                     .optionalEnd()
                     .toFormatter()
-                    .parse(v))
+                    .parse(currentTime))
                     .format(RFC_1123_DATE_TIME)
         }
     }
