@@ -1,4 +1,4 @@
-package engineer.ima.inventory.kotlin
+package engineer.ima.inventory.kotlin.workers
 
 import android.content.Context
 import android.provider.Settings
@@ -9,6 +9,7 @@ import androidx.work.WorkerParameters
 import com.google.gson.Gson
 import engineer.ima.inventory.kotlin.Application.Companion.KEY_RESPONSE_BODY
 import engineer.ima.inventory.kotlin.Application.Companion.KEY_STATUS_CODE
+import engineer.ima.inventory.kotlin.Preferences
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
@@ -23,10 +24,7 @@ class UpdateFcmToken(appContext: Context, workerParams: WorkerParameters) : Work
         val deviceId = inputData.getString("deviceId")
         val deviceName = inputData.getString("deviceName")
         val mUrl = URL("https://inventory.ima.engineer/v1/device/handset-link")
-        println("Using url %s".format(mUrl))
         val token = Preferences(applicationContext).firebaseToken
-        println("Received token: %s, deviceId: %s".format(token, deviceId))
-
         val androidId = Settings.Secure.getString(applicationContext.contentResolver, Settings.Secure.ANDROID_ID)
         val results = Data.Builder()
         with(mUrl.openConnection() as HttpsURLConnection) {

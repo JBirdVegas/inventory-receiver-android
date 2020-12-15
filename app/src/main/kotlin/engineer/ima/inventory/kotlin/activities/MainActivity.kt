@@ -1,22 +1,14 @@
-package engineer.ima.inventory.kotlin
+package engineer.ima.inventory.kotlin.activities
 
-import android.Manifest
-import android.annotation.TargetApi
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.ListView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.lifecycle.Observer
 import androidx.work.*
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.ktx.Firebase
@@ -24,16 +16,21 @@ import com.google.firebase.messaging.ktx.messaging
 import com.google.zxing.integration.android.IntentIntegrator
 import engineer.ima.inventory.R
 import engineer.ima.inventory.databinding.ActivityMainBinding
-import engineer.ima.inventory.kotlin.Application.Companion.runningQOrLater
+import engineer.ima.inventory.kotlin.LinkedDeviceAdapter
+import engineer.ima.inventory.kotlin.Preferences
+import engineer.ima.inventory.kotlin.workers.UpdateFcmToken
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
     private lateinit var listView: ListView
-    private lateinit var listViewAdapter: ArrayAdapter<String>
+    private lateinit var listViewAdapter: LinkedDeviceAdapter
+    private lateinit var prefs: Preferences
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
         val binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        prefs = Preferences(applicationContext)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             // Create channel to show notifications.
@@ -61,7 +58,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         listView = findViewById(R.id.linked_devices)
-        listViewAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, preferences.associatedDevices.toMutableList())
+        val arrayList = ArrayList(preferences.associatedDevices.toMutableList())
+        Log.d(TAG, "Found associated devices $arrayList")
+        listViewAdapter = LinkedDeviceAdapter(applicationContext, arrayList)
         listView.adapter = listViewAdapter
         listViewAdapter.notifyDataSetChanged()
         println(preferences.associatedDevices)
@@ -86,14 +85,14 @@ class MainActivity : AppCompatActivity() {
                 val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 val requestBuilder = OneTimeWorkRequest.Builder(UpdateFcmToken::class.java)
                 val dataBuilder = Data.Builder()
-                dataBuilder.putString("token", configs?.firebaseToken)
+                dataBuilder.putString("token", prefs.firebaseToken)
 
                 Log.d(TAG, "Data: %s".format(fullData))
                 val toTypedArray = fullData.split(":").toTypedArray()
 
                 val deviceUserName = toTypedArray[0]
                 val deviceHash = toTypedArray[1]
-                configs?.storeDeviceUsername(deviceHash, deviceUserName)
+                prefs.storeDeviceUsername(deviceHash, deviceUserName)
 
                 dataBuilder.putString("deviceName", deviceUserName)
                 dataBuilder.putString("deviceId", deviceHash)
@@ -102,7 +101,7 @@ class MainActivity : AppCompatActivity() {
 
                 val work = requestBuilder.build()
                 WorkManager.getInstance().beginWith(work).enqueue()
-                WorkManager.getInstance().getWorkInfoByIdLiveData(work.id).observe(this, Observer { workInfo ->
+                WorkManager.getInstance().getWorkInfoByIdLiveData(work.id).observe(this, { workInfo ->
                     if (workInfo != null && workInfo.state == WorkInfo.State.SUCCEEDED) {
                         updateListViewUi(deviceHash)
                     }
@@ -116,45 +115,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateListViewUi(device: String) {
-        val preferences = Preferences(applicationContext)
-        val associatedDevices = preferences.associatedDevices.toMutableSet()
-        if (listViewAdapter.isEmpty) {
-            listViewAdapter.add(device)
-            preferences.addAssociatedDevice(device)
-            listViewAdapter.notifyDataSetChanged()
-        } else {
-            var willAdd = true
-            for (i in 0 until associatedDevices.count()) {
-                if (listViewAdapter.getItem(i) == device) {
-                    willAdd = false
-                }
-            }
-            if (willAdd) {
-                listViewAdapter.add(device)
-                listViewAdapter.notifyDataSetChanged()
-            }
-        }
-    }
-
-    @TargetApi(29)
-    private fun foregroundAndBackgroundLocationPermissionApproved(): Boolean {
-        val foregroundLocationApproved = (
-                PackageManager.PERMISSION_GRANTED ==
-                        ActivityCompat.checkSelfPermission(this,
-                                Manifest.permission.ACCESS_FINE_LOCATION))
-        val backgroundPermissionApproved =
-                if (runningQOrLater) {
-                    PackageManager.PERMISSION_GRANTED ==
-                            ActivityCompat.checkSelfPermission(
-                                    this, Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                            )
-                } else {
-                    true
-                }
-        return foregroundLocationApproved && backgroundPermissionApproved
+        Preferences(applicationContext).addAssociatedDevice(device)
+        listViewAdapter.notifyDataSetChanged()
     }
 
     companion object {
-        private const val TAG = "MainActivity"
+        private val TAG = MainActivity::class.java.simpleName
     }
 }

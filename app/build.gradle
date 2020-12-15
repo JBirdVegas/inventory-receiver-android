@@ -33,6 +33,14 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+}
+
+repositories {
+    jcenter()
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
@@ -59,6 +67,7 @@ dependencies {
 
     implementation 'android.arch.work:work-runtime:1.0.1'
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
 
     // Testing dependencies
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
@@ -68,6 +77,7 @@ dependencies {
 
     implementation 'com.google.code.gson:gson:2.8.6'
     implementation 'com.journeyapps:zxing-android-embedded:3.4.0'
+    implementation 'com.github.sangcomz:StickyTimeLine:v0.1.1'
 }
 
 apply plugin: 'com.google.gms.google-services'

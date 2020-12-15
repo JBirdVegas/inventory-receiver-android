@@ -1,4 +1,4 @@
-package engineer.ima.inventory.kotlin
+package engineer.ima.inventory.kotlin.services
 
 import android.content.Context
 import android.content.Intent
