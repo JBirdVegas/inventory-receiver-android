@@ -18,45 +18,44 @@ import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
 class UpdateFcmToken(appContext: Context, workerParams: WorkerParameters) : Worker(appContext, workerParams) {
+    private val preferences = Preferences(appContext)
     override fun doWork(): Result {
-        Log.d(TAG, "Performing long running task in scheduled job")
-
-        val deviceId = inputData.getString("deviceId")
-        val deviceName = inputData.getString("deviceName")
         val mUrl = URL("https://inventory.ima.engineer/v1/device/handset-link")
-        val token = Preferences(applicationContext).firebaseToken
-        val androidId = Settings.Secure.getString(applicationContext.contentResolver, Settings.Secure.ANDROID_ID)
-        val results = Data.Builder()
-        with(mUrl.openConnection() as HttpsURLConnection) {
-            val map = mapOf("push_token" to token,
-                    "push_type" to "android",
-                    "handset_id" to androidId,
-                    "device_id" to deviceId,
-                    "device_name" to deviceName)
-            requestMethod = "POST"
-            BufferedWriter(OutputStreamWriter(outputStream)).use { bw ->
-                bw.write(Gson().toJson(map).toString())
-            }
-            Log.d(TAG, "Status Code: %d".format(this.responseCode))
-            Log.d(TAG, this.responseMessage)
-            BufferedReader(InputStreamReader(inputStream)).use { br ->
-                val response = StringBuffer()
-                var inputLine = br.readLine()
-                while (inputLine != null) {
+        val token = preferences.firebaseToken ?: return Result.failure()
+        if (preferences.associatedDevices.isEmpty()) {
+            return Result.failure()
+        }
 
-                    response.append(inputLine)
-                    inputLine = br.readLine()
+        val androidId = Settings.Secure.getString(applicationContext.contentResolver, Settings.Secure.ANDROID_ID)
+        for (device in preferences.associatedDevices) {
+            val results = Data.Builder()
+            with(mUrl.openConnection() as HttpsURLConnection) {
+                val map = mapOf("push_token" to token,
+                        "push_type" to "android",
+                        "handset_id" to androidId,
+                        "device_id" to device,
+                        "device_name" to preferences.getDeviceUsername(device))
+                requestMethod = "POST"
+                BufferedWriter(OutputStreamWriter(outputStream)).use { bw ->
+                    bw.write(Gson().toJson(map).toString())
                 }
-                Log.d(TAG, "Response : $response")
-                results.putInt(KEY_STATUS_CODE, this.responseCode)
-                        .putString(KEY_RESPONSE_BODY, response.toString())
+                Log.d(TAG, "Status Code: %d".format(this.responseCode))
+                Log.d(TAG, this.responseMessage)
+                BufferedReader(InputStreamReader(inputStream)).use { br ->
+                    val response = StringBuffer()
+                    var inputLine = br.readLine()
+                    while (inputLine != null) {
+
+                        response.append(inputLine)
+                        inputLine = br.readLine()
+                    }
+                    Log.d(TAG, "Response : $response")
+                    results.putInt(KEY_STATUS_CODE, this.responseCode)
+                            .putString(KEY_RESPONSE_BODY, response.toString())
+                }
             }
         }
-        return if (results.build().getInt(KEY_STATUS_CODE, 0) == 204) {
-            Result.success(results.build())
-        } else {
-            Result.failure(results.build())
-        }
+        return Result.success()
     }
 
     companion object {

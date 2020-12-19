@@ -1,0 +1,29 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="saveourcar.soc.MainActivity">
+    <item
+        android:orderInCategory="100"
+        android:title="Device Commands"
+        app:showAsAction="never">
+        <menu>
+            <item
+                android:id="@+id/action_ping_device"
+                android:icon="@drawable/common_full_open_on_phone"
+                android:title="Ping" />
+            <item
+                android:id="@+id/action_request_location_update"
+                android:icon="@drawable/common_full_open_on_phone"
+                android:title="GPS update" />
+            <item
+                android:id="@+id/action_request_device_beep"
+                android:icon="@drawable/common_full_open_on_phone"
+                android:title="Beep device" />
+            <item
+                android:id="@+id/action_request_device_screenshot"
+                android:icon="@drawable/common_full_open_on_phone"
+                android:title="Screenshot" />
+
+        </menu>
+    </item>
+</menu>

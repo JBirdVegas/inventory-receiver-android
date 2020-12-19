@@ -54,6 +54,7 @@ class LinkedDeviceAdapter(appContext: Context,
         lastTimestamp.setOnClickListener(getClickListener(position))
         lastAddress.setOnClickListener(getClickListener(position))
         v.setOnClickListener(getClickListener(position))
+//        v.setOnLongClickListener(getLongClickListener(position))
         return v
     }
 
@@ -62,7 +63,7 @@ class LinkedDeviceAdapter(appContext: Context,
             val itemAtPosition = arrayList[position]
             val intent = Intent(context, DeviceHistoryActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            Log.d(TAG, "Found item: %s".format(itemAtPosition))
+            Log.d(TAG, "onClicked on item: %s".format(itemAtPosition))
             intent.putExtra(DeviceHistoryActivity.DEVICE_ID, itemAtPosition)
             context.startActivity(intent)
         }

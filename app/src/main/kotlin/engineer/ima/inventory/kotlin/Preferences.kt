@@ -4,11 +4,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.google.gson.Gson
+import engineer.ima.inventory.kotlin.helpers.INet
 import engineer.ima.inventory.kotlin.structures.DeviceStructure
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
@@ -44,25 +43,12 @@ class Preferences(context: Context) {
         val file = File(deviceDir, checkin.deviceCheckin?.lastUpdated!!)
 
         val png = File(deviceDir, "%s.png".format(checkin.deviceCheckin?.lastUpdated!!))
-        val download = download(checkin.deviceCheckin?.location?.mapUrl!!)
+        val download = INet.download(checkin.deviceCheckin?.location?.mapUrl!!)
         png.writeBytes(download)
         checkin.deviceCheckin?.location?.mapUri = png.absolutePath
 
         FileOutputStream(file).use {
             it.write(gson.toJson(checkin).toByteArray(Charset.defaultCharset()))
-        }
-    }
-
-    private fun download(url: String): ByteArray {
-        val obj = URL(url)
-        val con = obj.openConnection() as HttpURLConnection
-        con.requestMethod = "GET"
-        val responseCode = con.responseCode
-        return if (responseCode == HttpURLConnection.HTTP_OK) { // connection ok
-            return con.inputStream.readBytes()
-
-        } else {
-            ByteArray(0)
         }
     }
 

@@ -1,12 +1,8 @@
 package engineer.ima.inventory.kotlin.activities
 
-import android.content.Context
 import android.graphics.BitmapFactory
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.BaseAdapter
+import android.view.*
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +12,7 @@ import engineer.ima.inventory.R
 import engineer.ima.inventory.kotlin.Preferences
 import engineer.ima.inventory.kotlin.helpers.TimeHelper
 import engineer.ima.inventory.kotlin.structures.DeviceStructure
+import engineer.ima.inventory.kotlin.workers.PaqWorker
 import xyz.sangcomz.stickytimelineview.TimeLineRecyclerView
 import xyz.sangcomz.stickytimelineview.callback.SectionCallback
 import xyz.sangcomz.stickytimelineview.model.SectionInfo
@@ -29,16 +26,15 @@ class DeviceHistoryActivity : AppCompatActivity() {
     }
 
     private var listView: TimeLineRecyclerView? = null
-    private var adapter: MyAdapter? = null
+    private lateinit var deviceId: String
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.device_history_activity)
         listView = findViewById(R.id.device_history_listview)
-        val deviceId = intent.extras?.getString(DEVICE_ID)
+        deviceId = intent.extras?.getString(DEVICE_ID)!!
 
-        val arrayList = Preferences(applicationContext).getDeviceCheckins(deviceId!!)
-        adapter = MyAdapter(applicationContext, arrayList)
-        listView?.adapter = SingerAdapter(arrayList)
+        val arrayList = Preferences(applicationContext).getDeviceCheckins(deviceId)
+        listView?.adapter = HistoryAdapter(arrayList)
 
         listView?.layoutManager = LinearLayoutManager(this,
                 LinearLayoutManager.VERTICAL,
@@ -63,14 +59,13 @@ class DeviceHistoryActivity : AppCompatActivity() {
         }
     }
 
-    class SingerAdapter(private val ourList: ArrayList<DeviceStructure>) : RecyclerView.Adapter<SingerAdapter.ViewHolder>() {
+    class HistoryAdapter(private val ourList: ArrayList<DeviceStructure>) : RecyclerView.Adapter<HistoryAdapter.ViewHolder>() {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val v = LayoutInflater.from(parent.context).inflate(
+            return ViewHolder(LayoutInflater.from(parent.context).inflate(
                     R.layout.device_history_listview_item,
                     parent,
-                    false)
-            return ViewHolder(v)
+                    false))
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
@@ -80,13 +75,17 @@ class DeviceHistoryActivity : AppCompatActivity() {
             holder.wifiAp.text = item.deviceCheckin?.currentAccessPoint?.ssid
             holder.date.text = TimeHelper.format(item.deviceCheckin?.lastUpdated!!)
 
-            item.deviceCheckin?.location?.mapUri?.let {
-                val file = File(it)
+            if (item.deviceCheckin?.location?.mapUri != null) {
+                val file = File(item.deviceCheckin?.location?.mapUri!!)
                 if (file.exists()) {
                     val readBytes = file.readBytes()
                     val b = BitmapFactory.decodeByteArray(readBytes, 0, readBytes.size, BitmapFactory.Options())
                     holder.map.setImageBitmap(b)
+                } else {
+                    holder.map.setImageBitmap(null)
                 }
+            } else {
+                holder.map.setImageBitmap(null)
             }
         }
 
@@ -100,44 +99,33 @@ class DeviceHistoryActivity : AppCompatActivity() {
         }
     }
 
-    class MyAdapter(private val context: Context, private val arrayList: java.util.ArrayList<DeviceStructure>) : BaseAdapter() {
-        private lateinit var address: TextView
-        private lateinit var wifiAp: TextView
-        private lateinit var date: TextView
-        private lateinit var map: ImageView
-        override fun getCount(): Int {
-            return arrayList.size
-        }
-
-        override fun getItem(position: Int): Any {
-            return position
-        }
-
-        override fun getItemId(position: Int): Long {
-            return position.toLong()
-        }
-
-        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-            val view: View? = convertView
-                    ?: LayoutInflater.from(context).inflate(R.layout.device_history_listview_item, parent, false)
-            address = view?.findViewById(R.id.list_item_address)!!
-            wifiAp = view.findViewById(R.id.list_item_wifi_ap)!!
-            date = view.findViewById(R.id.list_item_date)!!
-            map = view.findViewById(R.id.list_item_map)!!
-            address.text = arrayList[position].deviceCheckin?.location?.address
-            wifiAp.text = arrayList[position].deviceCheckin?.currentAccessPoint?.ssid
-            date.text = TimeHelper.format(arrayList[position].deviceCheckin?.lastUpdated!!)
-
-            arrayList[position].deviceCheckin?.location?.mapUri?.let {
-                val file = File(it)
-                if (file.exists()) {
-                    val readBytes = file.readBytes()
-                    val b = BitmapFactory.decodeByteArray(readBytes, 0, readBytes.size, BitmapFactory.Options())
-                    map.setImageBitmap(b)
-                }
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_ping_device -> {
+                PaqWorker.queueWork(deviceId, "ping")
+                true
             }
-            return view
+            R.id.action_request_location_update -> {
+                PaqWorker.queueWork(deviceId, "location_update")
+                true
+            }
+            R.id.action_request_device_beep -> {
+                PaqWorker.queueWork(deviceId, "play_sound")
+                true
+            }
+            R.id.action_request_device_screenshot -> {
+                PaqWorker.queueWork(deviceId, "screenshot")
+                true
+            }
+            else -> {
+                super.onOptionsItemSelected(item)
+            }
         }
     }
 
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        val inflater = menuInflater
+        inflater.inflate(R.menu.device_history_menu, menu)
+        return true
+    }
 }
