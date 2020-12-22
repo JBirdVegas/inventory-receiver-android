@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
@@ -17,6 +18,7 @@ import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
 import engineer.ima.inventory.R
 import engineer.ima.inventory.kotlin.Preferences
+import engineer.ima.inventory.kotlin.activities.DeviceHistoryActivity
 import engineer.ima.inventory.kotlin.activities.MainActivity
 import engineer.ima.inventory.kotlin.helpers.INet
 import engineer.ima.inventory.kotlin.structures.DeviceFileUpload
@@ -24,16 +26,13 @@ import engineer.ima.inventory.kotlin.structures.DeviceStructure
 import engineer.ima.inventory.kotlin.structures.PingReply
 import engineer.ima.inventory.kotlin.workers.UpdateFcmToken
 import java.io.File
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME
-import java.time.format.DateTimeFormatterBuilder
 import java.util.*
 
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
+        Log.d(TAG, "Message received!")
         if (remoteMessage.data.isNotEmpty()) {
             Log.d(TAG, "Discovered incoming data: ${remoteMessage.data}")
             val data = remoteMessage.data["data"]
@@ -47,18 +46,28 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 }
                 ACTION_DEVICE_REPLY -> {
                     Log.d(TAG, "Received: $data")
-                    sendDeviceReply(action, deviceId!!, data)
+                    val reply = Gson().fromJson(data!!, PingReply::class.java)
+                    reply.requestedAction?.deviceId = deviceId
+                    Preferences(applicationContext).storePingReply(reply)
+                    sendDeviceReply(reply)
                 }
                 ACTION_DEVICE_FILE_UPLOAD -> {
                     Log.d(TAG, "Received: $data")
                     val fileUpload = Gson().fromJson(data, DeviceFileUpload::class.java)
+                    Preferences(applicationContext).storeDeviceFileUpload(fileUpload)
                     sendDeviceFileUpload(action, fileUpload)
                 }
                 else -> {
                     Log.e(TAG, "Unhandled action type: $action")
                 }
             }
+
+            notifyUiOfUpdate()
         }
+    }
+
+    private fun notifyUiOfUpdate() {
+        LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(Intent(DeviceHistoryActivity.MyReceiver.ACTION_UPDATE))
     }
 
     private fun sendDeviceFileUpload(action: String, fileUpload: DeviceFileUpload) {
@@ -71,8 +80,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
         val downloaded = INet.download(fileUpload.downloadUrl!!)
 
-        val file = File(applicationContext.filesDir, "${fileUpload.uploadTime}-${fileUpload.fileName}")
-        file.writeBytes(downloaded)
+        val file = File(fileUpload.storedPath!!)
 
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
                 .setSmallIcon(R.drawable.ic_stat_ic_notification)
@@ -103,32 +111,25 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         notificationManager.notify(notificationId, notificationBuilder?.build())
     }
 
-    private fun sendDeviceReply(action: String, deviceId: String, data: String?) {
+    private fun sendDeviceReply(reply: PingReply) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val intent = Intent(this, MainActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pendingIntent = PendingIntent.getActivity(this, 0 /* Request code */, intent,
                 PendingIntent.FLAG_ONE_SHOT)
-        val channelId = "actions-$action-$deviceId"
+        val channelId = "actions-ping-${reply.requestedAction?.deviceId}"
 
-        Log.d(TAG, "Attempting to parse data: $data")
-        val reply = Gson().fromJson(data!!, PingReply::class.java)
-        val timeDiff = (Calendar.getInstance().time.time / 1000) - reply?.startTime?.toLong()!!
+        val timeDiff = (Calendar.getInstance().time.time / 1000) - reply.startTime?.toLong()!!
         Log.d(TAG, "timeDiff: ${Calendar.getInstance().time.time / 1000} - ${reply.startTime.toLong()} = $timeDiff")
 
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
-
                 .setSmallIcon(R.drawable.ic_stat_ic_notification)
-                .setContentTitle("PONG!")
-                .setContentText("Ping replied with %s in %s seconds".format(reply.ping, timeDiff))
-//                .setStyle(NotificationCompat.BigPictureStyle()
-//                        .setBigContentTitle("%s checkin via wifi ap: %s".format(userName, ssid))
-//                        .setSummaryText(deviceStructure.deviceCheckin?.location?.address)
-//                        .bigPicture(b))
+                .setContentTitle(getString(R.string.notification_ping_reply_title))
+                .setContentText(getString(R.string.notification_ping_reply_body).format(reply.ping, timeDiff))
                 .setAutoCancel(true)
                 .setNotificationSilent()
                 .setContentIntent(pendingIntent)
-        // Since android Oreo notification channel is needed.
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(channelId,
                     "User requested action responses",
@@ -147,25 +148,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val pendingIntent = PendingIntent.getActivity(this, 0 /* Request code */, intent,
                 PendingIntent.FLAG_ONE_SHOT)
 
-        val parsed = DateTimeFormatterBuilder()
-                .append(ISO_LOCAL_DATE_TIME)
-                .optionalStart()
-                .appendOffset("+HH:MM", "Z")
-                .optionalEnd()
-                .toFormatter()
-                .parse(deviceStructure.deviceCheckin?.lastUpdated)
-
-        val ofPattern = DateTimeFormatter.ofPattern("EEE, MMM dd'%s' 'at' h:m a")
-        val from = ZonedDateTime.from(parsed)
-        val zonedDateTime = from.format(ofPattern).format(getDayOfMonthSuffix(from.dayOfWeek.value))
-
         val ssid = deviceStructure.deviceCheckin?.currentAccessPoint?.ssid
         val userName = deviceStructure.deviceIds?.userIds?.userId
         val options = BitmapFactory.Options()
         deviceStructure.deviceCheckin?.location?.mapUrl?.let {
 
 
-            val download = File(deviceStructure.deviceCheckin?.location?.mapUri!!)
+            val download = File(deviceStructure.deviceCheckin?.location?.storedPath!!)
             val readBytes = download.readBytes()
             val b = BitmapFactory.decodeByteArray(readBytes, 0, readBytes.size, options)
 

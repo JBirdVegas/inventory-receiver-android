@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.*
 import com.google.gson.Gson
+import engineer.ima.inventory.BuildConfig
 import java.io.BufferedWriter
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -24,7 +25,7 @@ class PaqWorker(appContext: Context, workerParams: WorkerParameters) : Worker(ap
             return Result.failure()
         }
 
-        val url = URL("https://inventory.ima.engineer/v1/device/%s/paq".format(deviceId))
+        val url = URL("${BuildConfig.API_URL}/v1/device/%s/paq".format(deviceId))
         val sendBody = hashMapOf(
                 "action" to action,
                 "uuid" to UUID.randomUUID().toString(),
@@ -62,7 +63,7 @@ class PaqWorker(appContext: Context, workerParams: WorkerParameters) : Worker(ap
     private fun readFully(inputStream: InputStream): String {
         val baos = ByteArrayOutputStream()
         val buffer = ByteArray(1024)
-        var length = 0
+        var length: Int
         while (inputStream.read(buffer).also { length = it } != -1) {
             baos.write(buffer, 0, length)
         }

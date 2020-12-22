@@ -10,5 +10,6 @@ data class PingReply(
         @SerializedName("end_time")
         val endTime: String? = null,
         @SerializedName("requested_action")
-        val requestedAction: RequestedAction? = null
-)
+        val requestedAction: RequestedAction? = null,
+        var storedPath: String? = null,
+) : DeviceItem()

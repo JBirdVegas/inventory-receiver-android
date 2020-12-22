@@ -6,5 +6,5 @@ data class RequestedAction(
         val action: String? = null,
         @SerializedName("action_uuid")
         val actionUuid: String? = null,
-        val deviceId: String? = null
+        var deviceId: String? = null
 )

@@ -18,13 +18,18 @@ import engineer.ima.inventory.R
 import engineer.ima.inventory.databinding.ActivityMainBinding
 import engineer.ima.inventory.kotlin.LinkedDeviceAdapter
 import engineer.ima.inventory.kotlin.Preferences
+import engineer.ima.inventory.kotlin.workers.PaqWorker
 import engineer.ima.inventory.kotlin.workers.UpdateFcmToken
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
     private lateinit var listView: ListView
-    private lateinit var listViewAdapter: LinkedDeviceAdapter
     private lateinit var prefs: Preferences
+
+    private val networkConnectedConstraint = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val binding = ActivityMainBinding.inflate(layoutInflater)
@@ -60,10 +65,8 @@ class MainActivity : AppCompatActivity() {
         listView = findViewById(R.id.linked_devices)
         val arrayList = ArrayList(preferences.associatedDevices.toMutableList())
         Log.d(TAG, "Found associated devices $arrayList")
-        listViewAdapter = LinkedDeviceAdapter(applicationContext, arrayList)
-        listView.adapter = listViewAdapter
-        listViewAdapter.notifyDataSetChanged()
-        println(preferences.associatedDevices)
+        listView.adapter = LinkedDeviceAdapter(applicationContext, arrayList)
+        (listView.adapter as LinkedDeviceAdapter).notifyDataSetChanged()
     }
 
     private fun scanQRCode() {
@@ -82,7 +85,6 @@ class MainActivity : AppCompatActivity() {
         if (result != null) {
             if (result.contents != null) {
                 Toast.makeText(this, fullData, Toast.LENGTH_LONG).show()
-                val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 val requestBuilder = OneTimeWorkRequest.Builder(UpdateFcmToken::class.java)
                 val dataBuilder = Data.Builder()
                 dataBuilder.putString("token", prefs.firebaseToken)
@@ -93,19 +95,19 @@ class MainActivity : AppCompatActivity() {
                 val deviceUserName = toTypedArray[0]
                 val deviceHash = toTypedArray[1]
                 prefs.storeDeviceUsername(deviceHash, deviceUserName)
+                updateListViewUi(deviceHash)
+
+                PaqWorker.queueWork(deviceHash, "ping")
+                // create an initial request for items that require approval
+                PaqWorker.queueWork(deviceHash, "location_update")
+                PaqWorker.queueWork(deviceHash, "screenshot")
 
                 dataBuilder.putString("deviceName", deviceUserName)
                 dataBuilder.putString("deviceId", deviceHash)
                 requestBuilder.setInputData(dataBuilder.build())
-                requestBuilder.setConstraints(constraints)
-
-                val work = requestBuilder.build()
-                WorkManager.getInstance().beginWith(work).enqueue()
-                WorkManager.getInstance().getWorkInfoByIdLiveData(work.id).observe(this, { workInfo ->
-                    if (workInfo != null && workInfo.state == WorkInfo.State.SUCCEEDED) {
-                        updateListViewUi(deviceHash)
-                    }
-                })
+                requestBuilder.setConstraints(networkConnectedConstraint)
+                Preferences(applicationContext).addAssociatedDevice(deviceHash)
+                WorkManager.getInstance().beginWith(requestBuilder.build()).enqueue()
             } else {
                 Toast.makeText(this, "Cancelled", Toast.LENGTH_LONG).show()
             }
@@ -115,8 +117,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateListViewUi(device: String) {
-        Preferences(applicationContext).addAssociatedDevice(device)
-        listViewAdapter.notifyDataSetChanged()
+        (listView.adapter as LinkedDeviceAdapter).addToAdapter(device)
     }
 
     companion object {

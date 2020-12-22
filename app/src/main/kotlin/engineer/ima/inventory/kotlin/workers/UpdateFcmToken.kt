@@ -7,6 +7,7 @@ import androidx.work.Data
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.google.gson.Gson
+import engineer.ima.inventory.BuildConfig
 import engineer.ima.inventory.kotlin.Application.Companion.KEY_RESPONSE_BODY
 import engineer.ima.inventory.kotlin.Application.Companion.KEY_STATUS_CODE
 import engineer.ima.inventory.kotlin.Preferences
@@ -20,7 +21,7 @@ import javax.net.ssl.HttpsURLConnection
 class UpdateFcmToken(appContext: Context, workerParams: WorkerParameters) : Worker(appContext, workerParams) {
     private val preferences = Preferences(appContext)
     override fun doWork(): Result {
-        val mUrl = URL("https://inventory.ima.engineer/v1/device/handset-link")
+        val mUrl = URL("${BuildConfig.API_URL}/v1/device/handset-link")
         val token = preferences.firebaseToken ?: return Result.failure()
         if (preferences.associatedDevices.isEmpty()) {
             return Result.failure()

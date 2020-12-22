@@ -5,9 +5,11 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.google.gson.Gson
 import engineer.ima.inventory.kotlin.helpers.INet
+import engineer.ima.inventory.kotlin.structures.DeviceFileUpload
+import engineer.ima.inventory.kotlin.structures.DeviceItem
 import engineer.ima.inventory.kotlin.structures.DeviceStructure
+import engineer.ima.inventory.kotlin.structures.PingReply
 import java.io.File
-import java.io.FileOutputStream
 import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
@@ -21,6 +23,9 @@ class Preferences(context: Context) {
     private val associatedDevicesKey = "associated-devices"
     private val usernameTokenKey = "%s-username"
     private val notificationIdKey = "%s-notification-id"
+    private val deviceCheckinKey = "device-checkin"
+    private val pingReplyKey = "ping-reply"
+    private val fileUploadKey = "file-upload"
     private val prefs: SharedPreferences = context.getSharedPreferences(prefsFileName, 0)
     private var mContext = context
     val gson = Gson()
@@ -40,31 +45,56 @@ class Preferences(context: Context) {
     fun storeDeviceCheckin(checkin: DeviceStructure) {
         val deviceDir = File(mContext.filesDir, checkin.deviceIdsUniqueHash!!)
         deviceDir.mkdirs()
-        val file = File(deviceDir, checkin.deviceCheckin?.lastUpdated!!)
 
-        val png = File(deviceDir, "%s.png".format(checkin.deviceCheckin?.lastUpdated!!))
-        val download = INet.download(checkin.deviceCheckin?.location?.mapUrl!!)
-        png.writeBytes(download)
-        checkin.deviceCheckin?.location?.mapUri = png.absolutePath
-
-        FileOutputStream(file).use {
-            it.write(gson.toJson(checkin).toByteArray(Charset.defaultCharset()))
-        }
+        val png = File(deviceDir, "%s-%s.png".format(deviceCheckinKey, checkin.deviceCheckin?.lastUpdated!!))
+        val json = File(deviceDir, "%s-%s.json".format(deviceCheckinKey, checkin.deviceCheckin?.lastUpdated!!))
+        checkin.deviceCheckin?.location?.storedPath = png.absolutePath
+        png.writeBytes(INet.download(checkin.deviceCheckin?.location?.mapUrl!!))
+        json.writeBytes(gson.toJson(checkin).toByteArray(Charset.defaultCharset()))
     }
 
-    fun getDeviceCheckins(deviceId: String): ArrayList<DeviceStructure> {
+    fun storePingReply(reply: PingReply) {
+        val deviceDir = File(mContext.filesDir, reply.requestedAction?.deviceId!!)
+        deviceDir.mkdirs()
+        val json = File(deviceDir, "%s-%s.json".format(pingReplyKey, reply.endTime))
+        reply.storedPath = json.absolutePath
+        json.writeBytes(gson.toJson(reply).toByteArray(Charset.defaultCharset()))
+    }
+
+    fun storeDeviceFileUpload(fileUpload: DeviceFileUpload) {
+        val deviceDir = File(mContext.filesDir, fileUpload.deviceId!!)
+        deviceDir.mkdirs()
+
+        val png = File(deviceDir, "%s-%s.png".format(fileUploadKey, fileUpload.uploadTime))
+        val json = File(deviceDir, "%s-%s.json".format(fileUploadKey, fileUpload.uploadTime))
+        fileUpload.storedPath = png.absolutePath
+        png.writeBytes(INet.download(fileUpload.downloadUrl!!))
+        json.writeBytes(gson.toJson(fileUpload).toByteArray(Charset.defaultCharset()))
+    }
+
+    fun getDeviceCheckins(deviceId: String): List<DeviceItem> {
         val deviceDir = File(mContext.filesDir, deviceId)
-        Log.d(TAG, "Looking for checkins: %s".format(deviceId))
+        Log.d(TAG, "Looking for checkins: %s in dir: %s".format(deviceId, deviceDir.absolutePath))
         val toList = deviceDir.walkTopDown().toList()
-        val checkins = arrayListOf<DeviceStructure>()
+        val checkins = arrayListOf<DeviceItem>()
         for (file in toList) {
-            if (file.isFile && file.extension != "png") {
+            if (file.isFile && file.extension == "json") {
                 val text = readAsText(file.absolutePath)
-                val element = gson.fromJson(text, DeviceStructure::class.java)
-                checkins.add(element)
+                Log.d(TAG, "File: ${file.absolutePath}")
+                when {
+                    deviceCheckinKey in file.name -> {
+                        checkins.add(gson.fromJson(text, DeviceStructure::class.java))
+                    }
+                    pingReplyKey in file.name -> {
+                        checkins.add(gson.fromJson(text, PingReply::class.java))
+                    }
+                    fileUploadKey in file.name -> {
+                        checkins.add(gson.fromJson(text, DeviceFileUpload::class.java))
+                    }
+                }
             }
         }
-        return checkins
+        return checkins.asReversed().toTypedArray().toList()
     }
 
     fun getLatestDeviceCheckin(deviceId: String): DeviceStructure {
@@ -120,18 +150,18 @@ class Preferences(context: Context) {
 
     fun getNotificationId(deviceToken: String): Int {
         val int = prefs.getInt(notificationIdKey.format(deviceToken), 0)
+        if (int != 0) {
+            return int
+        }
         val instanceStrong = SecureRandom.getInstanceStrong()
         val nextInt = instanceStrong.nextInt()
-        if (int == 0) {
-            prefs.edit()
-                    .putInt(notificationIdKey.format(deviceToken), nextInt)
-                    .apply()
-            return nextInt
-        }
-        return int
+        prefs.edit()
+                .putInt(notificationIdKey.format(deviceToken), nextInt)
+                .apply()
+        return nextInt
     }
 
     companion object {
-        val TAG = Preferences::class.java.simpleName
+        val TAG: String = Preferences::class.java.simpleName
     }
 }

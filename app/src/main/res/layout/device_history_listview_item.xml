@@ -5,9 +5,8 @@
     android:orientation="vertical"
     android:padding="4dp">
 
-
     <TextView
-        android:id="@+id/list_item_address"
+        android:id="@+id/list_item_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Address"
@@ -15,7 +14,7 @@
         android:textSize="16sp" />
 
     <TextView
-        android:id="@+id/list_item_wifi_ap"
+        android:id="@+id/list_item_detail"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="WiFi"
@@ -31,8 +30,8 @@
         android:textSize="12sp"
         android:textStyle="bold" />
 
-    <ImageView
-        android:id="@+id/list_item_map"
+    <com.github.chrisbanes.photoview.PhotoView
+        android:id="@+id/list_item_image"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Map"

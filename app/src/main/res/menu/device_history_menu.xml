@@ -9,19 +9,19 @@
         <menu>
             <item
                 android:id="@+id/action_ping_device"
-                android:icon="@drawable/common_full_open_on_phone"
+                android:icon="@drawable/iconfinder_ping_pong"
                 android:title="Ping" />
             <item
                 android:id="@+id/action_request_location_update"
-                android:icon="@drawable/common_full_open_on_phone"
+                android:icon="@drawable/iconfinder_wifi_gps"
                 android:title="GPS update" />
             <item
                 android:id="@+id/action_request_device_beep"
-                android:icon="@drawable/common_full_open_on_phone"
+                android:icon="@drawable/iconfinder_beep"
                 android:title="Beep device" />
             <item
                 android:id="@+id/action_request_device_screenshot"
-                android:icon="@drawable/common_full_open_on_phone"
+                android:icon="@drawable/iconfinder_screenshot"
                 android:title="Screenshot" />
 
         </menu>

@@ -32,6 +32,6 @@ data class Location(
         var speed: String? = null,
         @SerializedName("map_url")
         var mapUrl: String? = null,
-        @SerializedName("map_uri")
-        var mapUri: String? = null,
+        @SerializedName("stored_path")
+        var storedPath: String? = null,
 )
