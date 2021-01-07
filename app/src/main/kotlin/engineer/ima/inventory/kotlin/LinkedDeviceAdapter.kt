@@ -58,7 +58,6 @@ class LinkedDeviceAdapter(appContext: Context,
         val item = arrayList[position]
         val checkins = prefs.getDeviceCheckins(item)
 
-        Log.d(TAG, "Received item: $item, checkins: $checkins")
         val deviceUsername = prefs.getDeviceUsername(item)
 
         if (checkins.isEmpty()) {
@@ -87,7 +86,6 @@ class LinkedDeviceAdapter(appContext: Context,
             val itemAtPosition = arrayList[position]
             val intent = Intent(context, DeviceHistoryActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            Log.d(TAG, "onClicked on item: %s".format(itemAtPosition))
             intent.putExtra(DeviceHistoryActivity.DEVICE_ID, itemAtPosition)
             context.startActivity(intent)
         }

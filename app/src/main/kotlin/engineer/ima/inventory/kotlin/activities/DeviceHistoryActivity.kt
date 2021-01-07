@@ -115,7 +115,6 @@ class DeviceHistoryActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            Log.d(TAG, "Item: ${ourList[position]}")
             when (val item = ourList[position]) {
                 is DeviceStructure -> {
                     updateViewForDeviceStructure(holder, item)
@@ -184,7 +183,8 @@ class DeviceHistoryActivity : AppCompatActivity() {
                     holder.detail.text = "Reply took ${et!!.toLong() - st!!.toLong()}"
                 }
             }
-            holder.date.text = actionReply.endTime
+            val date = Date(actionReply.endTime!!.toLong() * 1000)
+            holder.date.text = sdf.format(date)
             holder.image.setImageBitmap(null)
         }
 
