@@ -84,7 +84,10 @@ class Preferences(context: Context) {
 
     fun getDeviceCheckins(deviceId: String): List<DeviceItem> {
         val deviceDir = File(mContext.filesDir, deviceId)
-        Log.d(TAG, "Looking for checkins: %s in dir: %s".format(deviceId, deviceDir.absolutePath))
+        if (!deviceDir.exists()) {
+            deviceDir.mkdirs()
+        }
+        Log.d(TAG, "Looking for checkins: %s in dir: %s, exists? %s".format(deviceId, deviceDir.absolutePath, deviceDir.exists()))
         val listFiles = deviceDir.listFiles()
         Arrays.sort(listFiles, Comparator.comparing { obj: File ->
             getFileCreationEpoch(obj)
@@ -179,10 +182,10 @@ class Preferences(context: Context) {
         val TAG: String = Preferences::class.java.simpleName
         const val deviceCheckinKey = "device-checkin"
         const val pingReplyKey = "ping"
-        const val versionCheckReplyKey = "version_check"
+        const val versionCheckReplyKey = "version-check"
         const val fileUploadKey = "file-upload"
-        const val locationUpdate = "location_update"
-        const val playSound = "play_sound"
+        const val locationUpdate = "location-update"
+        const val playSound = "play-sound"
         const val screenshot = "screenshot"
     }
 }
