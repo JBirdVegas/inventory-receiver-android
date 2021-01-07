@@ -19,10 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import engineer.ima.inventory.R
 import engineer.ima.inventory.kotlin.Preferences
 import engineer.ima.inventory.kotlin.helpers.TimeHelper
-import engineer.ima.inventory.kotlin.structures.DeviceFileUpload
-import engineer.ima.inventory.kotlin.structures.DeviceItem
-import engineer.ima.inventory.kotlin.structures.DeviceStructure
-import engineer.ima.inventory.kotlin.structures.PingReply
+import engineer.ima.inventory.kotlin.structures.*
 import engineer.ima.inventory.kotlin.workers.PaqWorker
 import xyz.sangcomz.stickytimelineview.TimeLineRecyclerView
 import xyz.sangcomz.stickytimelineview.callback.SectionCallback
@@ -35,7 +32,7 @@ import java.util.*
 class DeviceHistoryActivity : AppCompatActivity() {
     companion object {
         private val TAG = DeviceHistoryActivity::class.java.simpleName
-        const val DEVICE_ID = "DEVICE_ID"
+        const val DEVICE_ID = "extras.DEVICE_ID"
     }
 
     private var listView: TimeLineRecyclerView? = null
@@ -49,7 +46,7 @@ class DeviceHistoryActivity : AppCompatActivity() {
         deviceId = intent.extras?.getString(DEVICE_ID)!!
 
         val arrayList = Preferences(applicationContext).getDeviceCheckins(deviceId)
-        listView?.adapter = HistoryAdapter(arrayList, windowManager)
+        listView?.adapter = HistoryAdapter(arrayList.toMutableList(), windowManager)
 
         listView?.layoutManager = LinearLayoutManager(this,
                 LinearLayoutManager.VERTICAL,
@@ -92,7 +89,16 @@ class DeviceHistoryActivity : AppCompatActivity() {
         }
     }
 
-    class HistoryAdapter(private val ourList: List<DeviceItem>, private val windowManager: WindowManager) : RecyclerView.Adapter<HistoryAdapter.ViewHolder>() {
+    class HistoryAdapter(private val ourList: MutableList<DeviceItem>, private val windowManager: WindowManager) : RecyclerView.Adapter<HistoryAdapter.ViewHolder>() {
+        val width: Int = getWidthForDisplay() / 8
+        val sdf = SimpleDateFormat("E, MMM dd yy hh:mm:ss z", Locale.getDefault())
+
+        fun getWidthForDisplay(): Int {
+            val displayMetrics = DisplayMetrics()
+            windowManager.defaultDisplay.getMetrics(displayMetrics)
+            return displayMetrics.widthPixels
+
+        }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
             return ViewHolder(LayoutInflater.from(parent.context).inflate(
@@ -103,82 +109,87 @@ class DeviceHistoryActivity : AppCompatActivity() {
 
         fun add(items: List<DeviceItem>) {
             for (i in items) {
-                ourList.toMutableList().add(i)
+                ourList.add(0, i)
             }
             notifyDataSetChanged()
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            Log.d(TAG, "Item: ${ourList[position]}")
             when (val item = ourList[position]) {
                 is DeviceStructure -> {
                     updateViewForDeviceStructure(holder, item)
                 }
                 is DeviceFileUpload -> {
-                    updateViewForFileUpload(holder, item)
+                    updateViewForFileUpload(width, holder, item)
                 }
-                is PingReply -> {
-                    updateViewForPingReply(holder, item)
+                is ActionReply -> {
+                    updateViewForActionReply(holder, item)
+                }
+                else -> {
+                    Log.d(TAG, "UNHANDLED: $item")
                 }
             }
         }
 
-        private fun resizeBitmap(temp: Bitmap, size: Int): Bitmap? {
-            return if (size > 0) {
-                val width = temp.width
-                val height = temp.height
-                val ratioBitmap = width.toFloat() / height.toFloat()
-                var finalWidth = size
-                var finalHeight = size
-                if (ratioBitmap < 1) {
-                    finalWidth = (size.toFloat() * ratioBitmap).toInt()
-                } else {
-                    finalHeight = (size.toFloat() / ratioBitmap).toInt()
-                }
-                Bitmap.createScaledBitmap(temp, finalWidth, finalHeight, true)
-            } else {
-                temp
-            }
-        }
-
-        private fun updateViewForFileUpload(holder: ViewHolder, item: DeviceFileUpload) {
-            Log.d(TAG, "Got File upload ${item.storedPath}")
-            if (item.storedPath != null) {
+        private fun decodeSampledBitmapFromItem(
+                item: DeviceItemStorable,
+                reqWidth: Int,
+                reqHeight: Int
+        ): Bitmap {
+            return BitmapFactory.Options().run {
                 val readBytes = File(item.storedPath!!).readBytes()
-                val b = BitmapFactory.decodeByteArray(readBytes, 0, readBytes.size, BitmapFactory.Options())
+                Log.d(TAG, "Read bytes: ${readBytes.size}")
+                inSampleSize = calculateInSampleSize(this, reqWidth, reqHeight)
+                BitmapFactory.decodeByteArray(readBytes, 0, readBytes.size, this)
+            }
+        }
 
-                val displayMetrics = DisplayMetrics()
+        private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+            val (height: Int, width: Int) = options.run { outHeight to outWidth }
+            var inSampleSize = 1
+            if (height > reqHeight || width > reqWidth) {
+                val halfHeight: Int = height / 2
+                val halfWidth: Int = width / 2
+                while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                    inSampleSize *= 2
+                }
+            }
+            return inSampleSize
+        }
 
-                windowManager.defaultDisplay.getMetrics(displayMetrics)
-                val width = displayMetrics.widthPixels
-
-                val scaled = resizeBitmap(b, width)
-                holder.image.setImageBitmap(scaled)
+        private fun updateViewForFileUpload(width: Int, holder: ViewHolder, item: DeviceFileUpload) {
+            if (item.storedPath != null) {
+                holder.image.setImageBitmap(decodeSampledBitmapFromItem(item, width, width))
             } else {
                 holder.image.setImageBitmap(null)
             }
             holder.title.text = "Screenshot ${item.fileName}"
             holder.detail.text = ""
             val date = Date(item.uploadTime!!.toLong() * 1000)
-
-            val sdf = SimpleDateFormat("E, MMM dd yy hh:mm:ss z", Locale.getDefault())
-
             holder.date.text = sdf.format(date)
         }
 
-        private fun updateViewForPingReply(holder: ViewHolder, pingReply: PingReply) {
-            holder.title.text = "Ping got reply ${pingReply.ping}"
-            pingReply.startTime.let { st ->
-                pingReply.endTime.let { et ->
-                    val s = et!!.toLong() - st!!.toLong()
-                    holder.detail.text = "Ping reply took $s"
-                }
+        private fun updateViewForActionReply(holder: ViewHolder, actionReply: ActionReply) {
+            var replyText = ""
+            if (actionReply.requestedAction!!.action == Preferences.pingReplyKey) {
+                replyText = actionReply.data!!.getValue("ping")
+            } else if (actionReply.requestedAction.action == Preferences.versionCheckReplyKey) {
+                replyText = "\nCurrent version: ${actionReply.data!!["current"]}\nLatest version: ${actionReply.data["latest"]}"
             }
 
-            holder.date.text = pingReply.endTime
+            holder.title.text = "${actionReply.requestedAction?.action} replied with $replyText"
+            actionReply.startTime.let { st ->
+                actionReply.endTime.let { et ->
+                    holder.detail.text = "Reply took ${et!!.toLong() - st!!.toLong()}"
+                }
+            }
+            holder.date.text = actionReply.endTime
             holder.image.setImageBitmap(null)
         }
 
         private fun updateViewForDeviceStructure(holder: ViewHolder, item: DeviceStructure) {
+            item.storedPath = item.deviceCheckin?.location?.storedPath
             holder.title.text = item.deviceCheckin?.location?.address
             holder.detail.text = item.deviceCheckin?.currentAccessPoint?.ssid
             holder.date.text = TimeHelper.format(item.deviceCheckin?.lastUpdated!!)
@@ -186,9 +197,7 @@ class DeviceHistoryActivity : AppCompatActivity() {
             if (item.deviceCheckin?.location?.storedPath != null) {
                 val file = File(item.deviceCheckin?.location?.storedPath!!)
                 if (file.exists()) {
-                    val readBytes = file.readBytes()
-                    val b = BitmapFactory.decodeByteArray(readBytes, 0, readBytes.size, BitmapFactory.Options())
-                    holder.image.setImageBitmap(b)
+                    holder.image.setImageBitmap(decodeSampledBitmapFromItem(item, width, width))
                 } else {
                     holder.image.setImageBitmap(null)
                 }
@@ -200,29 +209,33 @@ class DeviceHistoryActivity : AppCompatActivity() {
         override fun getItemCount(): Int = ourList.size
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            val title: TextView = view.findViewById<View>(R.id.list_item_title) as TextView
-            val detail: TextView = view.findViewById<View>(R.id.list_item_detail) as TextView
-            val date: TextView = view.findViewById<View>(R.id.list_item_date) as TextView
-            val image: ImageView = view.findViewById<View>(R.id.list_item_image) as ImageView
+            val title: TextView = view.findViewById(R.id.list_item_title)
+            val detail: TextView = view.findViewById(R.id.list_item_detail)
+            val date: TextView = view.findViewById(R.id.list_item_date)
+            val image: ImageView = view.findViewById(R.id.list_item_image)
         }
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_ping_device -> {
-                PaqWorker.queueWork(deviceId, "ping")
+                PaqWorker.queueWork(deviceId, Preferences.pingReplyKey)
                 true
             }
             R.id.action_request_location_update -> {
-                PaqWorker.queueWork(deviceId, "location_update")
+                PaqWorker.queueWork(deviceId, Preferences.locationUpdate)
                 true
             }
             R.id.action_request_device_beep -> {
-                PaqWorker.queueWork(deviceId, "play_sound")
+                PaqWorker.queueWork(deviceId, Preferences.playSound)
                 true
             }
             R.id.action_request_device_screenshot -> {
-                PaqWorker.queueWork(deviceId, "screenshot")
+                PaqWorker.queueWork(deviceId, Preferences.screenshot)
+                true
+            }
+            R.id.action_request_device_version_check -> {
+                PaqWorker.queueWork(deviceId, Preferences.versionCheckReplyKey)
                 true
             }
             else -> {

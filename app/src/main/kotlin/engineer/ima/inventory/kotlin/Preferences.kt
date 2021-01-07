@@ -5,15 +5,17 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.google.gson.Gson
 import engineer.ima.inventory.kotlin.helpers.INet
+import engineer.ima.inventory.kotlin.structures.ActionReply
 import engineer.ima.inventory.kotlin.structures.DeviceFileUpload
 import engineer.ima.inventory.kotlin.structures.DeviceItem
 import engineer.ima.inventory.kotlin.structures.DeviceStructure
-import engineer.ima.inventory.kotlin.structures.PingReply
 import java.io.File
+import java.io.IOException
 import java.nio.charset.Charset
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.attribute.BasicFileAttributes
 import java.security.SecureRandom
 import java.util.*
 
@@ -23,9 +25,6 @@ class Preferences(context: Context) {
     private val associatedDevicesKey = "associated-devices"
     private val usernameTokenKey = "%s-username"
     private val notificationIdKey = "%s-notification-id"
-    private val deviceCheckinKey = "device-checkin"
-    private val pingReplyKey = "ping-reply"
-    private val fileUploadKey = "file-upload"
     private val prefs: SharedPreferences = context.getSharedPreferences(prefsFileName, 0)
     private var mContext = context
     val gson = Gson()
@@ -53,10 +52,10 @@ class Preferences(context: Context) {
         json.writeBytes(gson.toJson(checkin).toByteArray(Charset.defaultCharset()))
     }
 
-    fun storePingReply(reply: PingReply) {
+    fun storeActionReply(reply: ActionReply) {
         val deviceDir = File(mContext.filesDir, reply.requestedAction?.deviceId!!)
         deviceDir.mkdirs()
-        val json = File(deviceDir, "%s-%s.json".format(pingReplyKey, reply.endTime))
+        val json = File(deviceDir, "%s-%s.json".format(reply.requestedAction.action, reply.endTime))
         reply.storedPath = json.absolutePath
         json.writeBytes(gson.toJson(reply).toByteArray(Charset.defaultCharset()))
     }
@@ -72,29 +71,44 @@ class Preferences(context: Context) {
         json.writeBytes(gson.toJson(fileUpload).toByteArray(Charset.defaultCharset()))
     }
 
+    fun getFileCreationEpoch(file: File): Long {
+        return try {
+            val attr: BasicFileAttributes = Files.readAttributes(file.toPath(),
+                    BasicFileAttributes::class.java)
+            attr.creationTime()
+                    .toInstant().toEpochMilli()
+        } catch (e: IOException) {
+            throw RuntimeException(file.absolutePath, e)
+        }
+    }
+
     fun getDeviceCheckins(deviceId: String): List<DeviceItem> {
         val deviceDir = File(mContext.filesDir, deviceId)
         Log.d(TAG, "Looking for checkins: %s in dir: %s".format(deviceId, deviceDir.absolutePath))
-        val toList = deviceDir.walkTopDown().toList()
+        val listFiles = deviceDir.listFiles()
+        Arrays.sort(listFiles, Comparator.comparing { obj: File ->
+            getFileCreationEpoch(obj)
+        }.reversed())
+
         val checkins = arrayListOf<DeviceItem>()
-        for (file in toList) {
+        for (file in listFiles) {
             if (file.isFile && file.extension == "json") {
                 val text = readAsText(file.absolutePath)
-                Log.d(TAG, "File: ${file.absolutePath}")
                 when {
                     deviceCheckinKey in file.name -> {
                         checkins.add(gson.fromJson(text, DeviceStructure::class.java))
                     }
-                    pingReplyKey in file.name -> {
-                        checkins.add(gson.fromJson(text, PingReply::class.java))
+                    pingReplyKey in file.name || versionCheckReplyKey in file.name -> {
+                        checkins.add(gson.fromJson(text, ActionReply::class.java))
                     }
                     fileUploadKey in file.name -> {
                         checkins.add(gson.fromJson(text, DeviceFileUpload::class.java))
                     }
+                    else -> Log.d(TAG, "Error unhandled file type: ${file.name}")
                 }
             }
         }
-        return checkins.asReversed().toTypedArray().toList()
+        return checkins.toTypedArray().toList()
     }
 
     fun getLatestDeviceCheckin(deviceId: String): DeviceStructure {
@@ -163,5 +177,12 @@ class Preferences(context: Context) {
 
     companion object {
         val TAG: String = Preferences::class.java.simpleName
+        const val deviceCheckinKey = "device-checkin"
+        const val pingReplyKey = "ping"
+        const val versionCheckReplyKey = "version_check"
+        const val fileUploadKey = "file-upload"
+        const val locationUpdate = "location_update"
+        const val playSound = "play_sound"
+        const val screenshot = "screenshot"
     }
 }

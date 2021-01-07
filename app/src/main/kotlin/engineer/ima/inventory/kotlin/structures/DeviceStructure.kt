@@ -9,4 +9,4 @@ data class DeviceStructure(
         var deviceIdsUniqueHash: String? = null,
         @SerializedName("device_checkin")
         var deviceCheckin: DeviceCheckin? = null,
-) : DeviceItem()
+) : DeviceItemStorable()

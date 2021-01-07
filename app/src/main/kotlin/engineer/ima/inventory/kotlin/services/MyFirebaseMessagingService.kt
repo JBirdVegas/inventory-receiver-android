@@ -21,9 +21,10 @@ import engineer.ima.inventory.kotlin.Preferences
 import engineer.ima.inventory.kotlin.activities.DeviceHistoryActivity
 import engineer.ima.inventory.kotlin.activities.MainActivity
 import engineer.ima.inventory.kotlin.helpers.INet
+import engineer.ima.inventory.kotlin.structures.ActionReply
+import engineer.ima.inventory.kotlin.structures.ActionVersionCheck
 import engineer.ima.inventory.kotlin.structures.DeviceFileUpload
 import engineer.ima.inventory.kotlin.structures.DeviceStructure
-import engineer.ima.inventory.kotlin.structures.PingReply
 import engineer.ima.inventory.kotlin.workers.UpdateFcmToken
 import java.io.File
 import java.util.*
@@ -45,10 +46,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     sendNotification(deviceStructure)
                 }
                 ACTION_DEVICE_REPLY -> {
-                    Log.d(TAG, "Received: $data")
-                    val reply = Gson().fromJson(data!!, PingReply::class.java)
+                    val reply = Gson().fromJson(data!!, ActionReply::class.java)
+                    Log.d(TAG, "Received data wrapper: $reply")
                     reply.requestedAction?.deviceId = deviceId
-                    Preferences(applicationContext).storePingReply(reply)
+                    Preferences(applicationContext).storeActionReply(reply)
                     sendDeviceReply(reply)
                 }
                 ACTION_DEVICE_FILE_UPLOAD -> {
@@ -111,21 +112,41 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         notificationManager.notify(notificationId, notificationBuilder?.build())
     }
 
-    private fun sendDeviceReply(reply: PingReply) {
+    private fun sendDeviceReply(reply: ActionReply) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val intent = Intent(this, MainActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val pendingIntent = PendingIntent.getActivity(this, 0 /* Request code */, intent,
                 PendingIntent.FLAG_ONE_SHOT)
-        val channelId = "actions-ping-${reply.requestedAction?.deviceId}"
+        val channelId = "actions-${reply.requestedAction?.action}-${reply.requestedAction?.deviceId}"
 
         val timeDiff = (Calendar.getInstance().time.time / 1000) - reply.startTime?.toLong()!!
         Log.d(TAG, "timeDiff: ${Calendar.getInstance().time.time / 1000} - ${reply.startTime.toLong()} = $timeDiff")
 
+
+        var title = ""
+        var contentText = ""
+        when (reply.requestedAction?.action) {
+            Preferences.pingReplyKey -> {
+                title = getString(R.string.notification_ping_reply_title)
+                contentText = getString(R.string.notification_ping_reply_body).format(reply.data!!["ping"], timeDiff)
+            }
+            Preferences.versionCheckReplyKey -> {
+                val gson = Gson()
+                val check = gson.fromJson(gson.toJson(reply.data), ActionVersionCheck::class.java)
+                title = getString(R.string.notification_version_check_reply_title)
+                contentText = if (check.current == check.latest) {
+                    getString(R.string.notification_version_check_reply_body_client_up_to_date).format(check.current)
+                } else {
+                    getString(R.string.notification_version_check_reply_body_client_should_update).format(check.current, check.latest)
+                }
+            }
+        }
+
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
                 .setSmallIcon(R.drawable.ic_stat_ic_notification)
-                .setContentTitle(getString(R.string.notification_ping_reply_title))
-                .setContentText(getString(R.string.notification_ping_reply_body).format(reply.ping, timeDiff))
+                .setContentTitle(title)
+                .setContentText(contentText)
                 .setAutoCancel(true)
                 .setNotificationSilent()
                 .setContentIntent(pendingIntent)

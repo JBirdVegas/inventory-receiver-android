@@ -4,25 +4,29 @@
     tools:context="saveourcar.soc.MainActivity">
     <item
         android:orderInCategory="100"
-        android:title="Device Commands"
+        android:title="@string/menu_device_commands"
         app:showAsAction="never">
         <menu>
             <item
                 android:id="@+id/action_ping_device"
                 android:icon="@drawable/iconfinder_ping_pong"
-                android:title="Ping" />
+                android:title="@string/menu_device_ping" />
             <item
                 android:id="@+id/action_request_location_update"
                 android:icon="@drawable/iconfinder_wifi_gps"
-                android:title="GPS update" />
+                android:title="@string/menu_device_gps_update" />
             <item
                 android:id="@+id/action_request_device_beep"
                 android:icon="@drawable/iconfinder_beep"
-                android:title="Beep device" />
+                android:title="@string/menu_device_beep_device" />
             <item
                 android:id="@+id/action_request_device_screenshot"
                 android:icon="@drawable/iconfinder_screenshot"
-                android:title="Screenshot" />
+                android:title="@string/menu_device_screenshot" />
+            <item
+                android:id="@+id/action_request_device_version_check"
+                android:icon="@drawable/iconfinder_version_check"
+                android:title="@string/menu_device_version_check" />
 
         </menu>
     </item>

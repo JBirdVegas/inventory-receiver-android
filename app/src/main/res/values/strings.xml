@@ -12,4 +12,13 @@
     <string name="fcm_message">FCM Message</string>
     <string name="notification_ping_reply_title">PONG!</string>
     <string name="notification_ping_reply_body">Ping replied with %s in %s seconds</string>
+    <string name="notification_version_check_reply_title">Version Check</string>
+    <string name="notification_version_check_reply_body_client_up_to_date">Client is on the latest version %s</string>
+    <string name="notification_version_check_reply_body_client_should_update">Client should update to latest version %s -> %s</string>
+    <string name="menu_device_version_check">Version check</string>
+    <string name="menu_device_screenshot">Screenshot</string>
+    <string name="menu_device_beep_device">Beep device</string>
+    <string name="menu_device_gps_update">GPS update</string>
+    <string name="menu_device_ping">Ping</string>
+    <string name="menu_device_commands">Device Commands</string>
 </resources>

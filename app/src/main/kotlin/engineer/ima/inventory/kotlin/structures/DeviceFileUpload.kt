@@ -11,7 +11,4 @@ data class DeviceFileUpload(
         val fileName: String? = null,
         @SerializedName("upload_time")
         val uploadTime: String? = null,
-
-        @SerializedName("stored_path")
-        var storedPath: String? = null
-) : DeviceItem()
+) : DeviceItemStorable()
